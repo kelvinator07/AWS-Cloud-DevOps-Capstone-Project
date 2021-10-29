@@ -1,0 +1,26 @@
+{
+	"name": "aws-cloud-devops-capstone-project",
+	"version": "1.0.0",
+	"description": "",
+	"main": "server.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kelvinator07/AWS-Cloud-DevOps-Capstone-Project.git"
+	},
+	"author": "Kelvin Obukome",
+	"license": "ISC",
+	"bugs": {
+		"url": "https://github.com/kelvinator07/AWS-Cloud-DevOps-Capstone-Project/issues"
+	},
+	"homepage": "https://github.com/kelvinator07/AWS-Cloud-DevOps-Capstone-Project#readme",
+	"dependencies": {
+		"cors": "^2.8.5",
+		"express": "^4.17.1",
+		"pg": "^8.7.1",
+		"pg-hstore": "^2.3.4",
+		"sequelize": "^6.8.0"
+	}
+}

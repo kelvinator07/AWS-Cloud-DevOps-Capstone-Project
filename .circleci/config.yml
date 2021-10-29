@@ -1,0 +1,45 @@
+defaults: &defaults
+  docker: # it uses the docker executor
+    - image: circleci/node:13.8.0
+    
+# Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
+version: 2.1
+commands:
+  print_pipeline_id:
+    description: "prints the Circle CI Workflow ID from its environment variable"
+    steps:
+      - run: echo ${CIRCLE_WORKFLOW_ID}
+
+# Use a package of configuration called an orb.
+orbs:
+  # Declare a dependency on the welcome-orb
+  welcome: circleci/welcome-orb@0.4.1
+  
+# Orchestrate or schedule a set of jobs
+jobs:
+  pipeline_id_job: # This is our first job.
+    <<: *defaults
+    # Steps are a list of commands to run inside the docker container above.
+    steps:
+      - print_pipeline_id
+
+  build:
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          name: "echo build url"
+          command: |
+            echo $CIRCLE_BUILD_URL
+      - run:
+          name: "Run Node Server"
+          command: |
+            npm install
+            node server.js
+
+workflows:
+  my_workflow:
+    # Run jobs in its own container
+    jobs:
+      - pipeline_id_job
+      - build
