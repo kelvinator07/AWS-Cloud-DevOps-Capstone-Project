@@ -4,7 +4,10 @@
 	"description": "",
 	"main": "server.js",
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"start": "node server.js",
+		"test": "nyc mocha --timeout 10000",
+		"lint": "npx prettier --check .",
+		"lint:fix": "npx eslint . --fix && npx prettier --write ."
 	},
 	"repository": {
 		"type": "git",
@@ -18,9 +21,22 @@
 	"homepage": "https://github.com/kelvinator07/AWS-Cloud-DevOps-Capstone-Project#readme",
 	"dependencies": {
 		"cors": "^2.8.5",
+		"dotenv": "^10.0.0",
 		"express": "^4.17.1",
 		"pg": "^8.7.1",
 		"pg-hstore": "^2.3.4",
 		"sequelize": "^6.8.0"
+	},
+	"devDependencies": {
+		"chai": "^4.3.4",
+		"eslint": "^8.2.0",
+		"eslint-config-airbnb-base": "^15.0.0",
+		"eslint-config-prettier": "^8.3.0",
+		"eslint-plugin-chai-friendly": "^0.7.2",
+		"eslint-plugin-import": "^2.25.3",
+		"eslint-plugin-prettier": "^4.0.0",
+		"mocha": "^9.1.3",
+		"nyc": "^15.1.0",
+		"prettier": "^2.4.1"
 	}
 }

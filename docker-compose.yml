@@ -1,0 +1,19 @@
+version: "2"
+
+services:
+# Database Service (Postgres)
+  postgres-db:
+    image: postgres
+    container_name: postgres-db
+    environment:
+      - POSTGRES_DB=mytestdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=12345
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
+  
