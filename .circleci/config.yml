@@ -245,7 +245,7 @@ jobs:
           command: |
             aws cloudformation deploy \
               --template-file .circleci/files/backend.yml \
-              --tags project=udapeople \
+              --tags project=finalproject \
               --stack-name node-app-stack-${CIRCLE_WORKFLOW_ID:0:5} \
               --parameter-overrides ID=${CIRCLE_WORKFLOW_ID:0:5} \
               --region ${AWS_DEFAULT_REGION}  
@@ -507,12 +507,12 @@ workflows:
           requires: [build-node-app]
       - lint-node-app:
           requires: [scan-node-app]
-      # - deploy-infrastructure:
-      #     requires: [scan-node-app]
-      #     filters:
-      #       branches:
-      #         only:
-      #           - master
+      - deploy-infrastructure:
+          requires: [scan-node-app, lint-node-app]
+          filters:
+            branches:
+              only:
+                - master
       # - configure-infrastructure:
       #     requires: [deploy-infrastructure]
       #     filters:

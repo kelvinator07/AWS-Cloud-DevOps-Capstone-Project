@@ -1,0 +1,59 @@
+---
+- name: Update apt packages
+  become: yes
+  apt:
+    update_cache: yes
+
+- name: "upgrade packages"
+  become: yes
+  apt:
+    upgrade: yes
+
+- name: remove dependencies that are no longer required
+  become: yes
+  apt:
+    autoremove: yes
+
+- name: "install dependencies."
+  become: true
+  apt:
+    name: ["nodejs", "npm", "python3", "tar", "gzip", "git"]
+    state: latest
+    update_cache: yes
+
+- name: "install pm2"
+  become: true
+  npm:
+    name: pm2
+    global: yes
+    production: yes
+    state: present
+
+- name: Creates directory
+  file:
+    path: /home/ubuntu/backend
+    state: directory
+
+- name: Copy backend dist files web server
+  copy:
+    src: /root/project/artifact.tar.gz
+    dest: /home/ubuntu/backend/artifact.tar.gz
+
+- name: Uncompress Backend
+  shell: |
+    cd /home/ubuntu/backend
+    tar xvzf artifact.tar.gz -C .
+    ls -la
+    
+- name: Build and Start PM2
+  shell: |
+    cd /home/ubuntu/backend 
+    npm install
+    npm run build
+    pm2 start npm --name backend -- start
+
+- name: save your list of processes
+  shell: |
+    cd /home/ubuntu/backend
+    pm2 save  
+    
