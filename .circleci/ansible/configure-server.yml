@@ -12,12 +12,13 @@
     - ansible_host_key_checking: false
     - ansible_stdout_callback: yaml
     - ENVIRONMENT: "{{ lookup('env','ENVIRONMENT') }}"
+    - PROD_PORT: "{{ lookup('env','PROD_PORT') }}"
     - NODE_ENV: "{{ lookup('env','NODE_ENV') }}"
-    - DEV_DB_HOST: "{{ lookup('env','DEV_DB_HOST') }}"
-    - DEV_DB_USER: "{{ lookup('env','DEV_DB_USER') }}"
-    - DEV_DB_PASSWORD: "{{ lookup('env','DEV_DB_PASSWORD') }}"
-    - DEV_DB_NAME: "{{ lookup('env','DEV_DB_NAME') }}"
-    - DEV_DB_DIALECT: "{{ lookup('env','DEV_DB_DIALECT') }}"
+    - PROD_DB_HOST: "{{ lookup('env','PROD_DB_HOST') }}"
+    - PROD_DB_USER: "{{ lookup('env','PROD_DB_USER') }}"
+    - PROD_DB_PASSWORD: "{{ lookup('env','PROD_DB_PASSWORD') }}"
+    - PROD_DB_NAME: "{{ lookup('env','PROD_DB_NAME') }}"
+    - PROD_DB_DIALECT: "{{ lookup('env','PROD_DB_DIALECT') }}"
 
   pre_tasks:
     - name: "wait 600 seconds for target connection to become reachable/usable."

@@ -1,16 +1,22 @@
 const express = require('express');
 const cors = require('cors');
+const log4js = require('log4js');
 
 const app = express();
 
-const db = require('./app/models');
+const dbConfig = require('./app/config/app.config');
 
-db.sequelize.sync();
+log4js.configure(dbConfig.logging);
+const logger = log4js.getLogger('server');
 
-db.sequelize.sync({ force: true }).then(() => {
-    // eslint-disable-next-line no-console
-    console.log('Drop and re-sync db.');
-});
+// const db = require('./app/models');
+
+// db.sequelize.sync();
+
+// db.sequelize.sync({ force: true }).then(() => {
+//     // eslint-disable-next-line no-console
+//     logger.debug('Drop and re-sync db.');
+// });
 
 const corsOptions = {
     origin: 'http://localhost:8081'
@@ -29,13 +35,13 @@ app.get('/', (req, res) => {
     res.json({ message: 'Welcome to geeky application.' });
 });
 
-require('./app/routes/tutorial.routes')(app);
+// require('./app/routes/tutorial.routes')(app);
 
 // set port, listen for requests
-const PORT = process.env.PORT || 8080;
+const PORT = dbConfig.PORT || 9000;
 app.listen(PORT, () => {
     // eslint-disable-next-line no-console
-    console.log(`Server is running on port ${PORT}.`);
+    logger.info(`Server is running on port ${PORT}.`);
     // eslint-disable-next-line no-console
-    console.log('Press CTRL-C to stop\n');
+    logger.debug('Press CTRL-C to stop\n');
 });

@@ -31,29 +31,28 @@
 
 - name: Creates directory
   file:
-    path: /home/ubuntu/backend
+    path: /home/ubuntu/nodeapp
     state: directory
 
 - name: Copy backend dist files web server
   copy:
     src: /root/project/artifact.tar.gz
-    dest: /home/ubuntu/backend/artifact.tar.gz
+    dest: /home/ubuntu/nodeapp/artifact.tar.gz
 
 - name: Uncompress Backend
   shell: |
-    cd /home/ubuntu/backend
+    cd /home/ubuntu/nodeapp
     tar xvzf artifact.tar.gz -C .
     ls -la
     
 - name: Build and Start PM2
   shell: |
-    cd /home/ubuntu/backend 
+    cd /home/ubuntu/nodeapp 
     npm install
-    npm run build
-    pm2 start npm --name backend -- start
+    pm2 start npm --name nodeapp -- start
 
 - name: save your list of processes
   shell: |
-    cd /home/ubuntu/backend
+    cd /home/ubuntu/nodeapp
     pm2 save  
     

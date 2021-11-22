@@ -3,3 +3,4 @@ package.json
 package-lock.json
 *.log
 *.yml
+.nyc_output/

@@ -10,8 +10,31 @@ orbs:
   aws-cli: circleci/aws-cli@2.0.3
   node: circleci/node@3.0.0
   slack: circleci/slack@4.4.4
+  kubernetes: circleci/kubernetes@0.12.0
+  aws-eks: circleci/aws-eks@0.2.3
+
+parameters:
+  circleci_image:
+    type: string
+    default: circleci/node:13.8.0
+  amazon_image:
+    type: string
+    default: amazon/aws-cli
+  stretch_image:
+    type: string
+    default: python:3.7.3-stretch
 
 commands:
+  destroy-cluster:
+    description: Destroy EKS Cluster.
+    steps:
+      - run:
+          name: Destroy environments
+          when: on_fail
+          command: |
+            aws cloudformation delete-stack --stack-name eksctl-devopscapstone-nodegroup-nodegroup --region us-east-1
+            aws cloudformation delete-stack --stack-name eksctl-devopscapstone-cluster --region us-east-1
+
   print_pipeline_id:
     description: "prints the Circle CI Workflow ID from its environment variable"
     steps:
@@ -35,15 +58,6 @@ commands:
       workflow_id:
         type: "string"   
     steps:
-      - run:
-          name: Delete all files in the current S3 bucket
-          command: |
-            if aws s3api head-bucket --bucket udapeople-${CIRCLE_WORKFLOW_ID:0:5}
-            then
-              aws s3 rm s3://udapeople-${CIRCLE_WORKFLOW_ID:0:5} --recursive
-              echo "Delete all files in the current S3 bucket successful"
-            fi
-          when: on_fail
       - run:
           name: Destroy environments
           when: on_fail
@@ -149,32 +163,6 @@ commands:
               ]
             }
           event: fail
-
-  revert-migrations:
-    description: Revert the last migration if successfully run in the current workflow.
-    parameters:
-      # Add parameter here
-      workflow_id:
-        type: string     
-    steps:
-      - run:
-          name: Revert migrations
-          # Add when this will run
-          when: on_fail
-          command: |
-            # Curl command here to see if there was a successful migration associated with the workflow id, store result in SUCCESS variable
-            export SUCCESS=$(curl -H "Content-Type: text/plain" -H "token: ${CIRCLE_WORKFLOW_ID}" --request GET https://api.memstash.io/values/migration_${CIRCLE_WORKFLOW_ID})
-            echo $SUCCESS
-            #  Add revert code here. You can find this in the Getting Started section.
-            if(( ${SUCCESS}==1 )); then
-              cd backend
-              npm install
-              npm run migrations:revert
-              echo "Migration reverted"
-            else
-              echo "Migration revert was unsuccessful" 
-            fi
-
   
 # Orchestrate or schedule a set of jobs
 jobs:
@@ -227,130 +215,33 @@ jobs:
           command: |
             sudo npm install -g eslint
             npm run lint
-
-  deploy-infrastructure:
+  
+  lint-docker:
     docker:
-      - image: amazon/aws-cli # Docker image here that supports AWS CLI
+      - image: << pipeline.parameters.stretch_image >>
     steps:
       # Checkout code from git
       - checkout
-      - run: yum install -y tar gzip jq
+      # Restore from cache
+      - restore_cache:
+          keys: [node-build]
+      # Your job code here
       - run:
-          name: Ensure back-end infrastructure exists
+          name: install dependencies
           command: |
-            aws cloudformation deploy \
-              --template-file .circleci/files/backend.yml \
-              --tags project=finalproject \
-              --stack-name node-app-stack-${CIRCLE_WORKFLOW_ID:0:5} \
-              --parameter-overrides ID=${CIRCLE_WORKFLOW_ID:0:5} \
-              --region ${AWS_DEFAULT_REGION}  
+            python3 -m venv venv
+            . venv/bin/activate
+            wget -O /bin/hadolint https://github.com/hadolint/hadolint/releases/download/v1.16.3/hadolint-Linux-x86_64 &&\
+            chmod +x /bin/hadolint
       - run:
-          name: Add back-end ip to ansible inventory
+          name: run lint
           command: |
-            # Your code here
-            aws ec2 describe-instances \
-            --query 'Reservations[*].Instances[*].PublicIpAddress' \
-            --output text >> ~/project/.circleci/ansible/inventory.txt
-
-            cat .circleci/ansible/inventory.txt
-      - persist_to_workspace:
-          root: ~/
-          paths:
-            - project/.circleci/ansible/inventory.txt
-      # Here's where you will add some code to rollback on failure  
-      - destroy-environment:
-          workflow_id: ${CIRCLE_WORKFLOW_ID:0:5}
-
-  configure-infrastructure:
-    docker:
-      - image: python:3.7-alpine3.11
-    steps:
-      # Checkout code from git
-      - checkout
-      # Add ssh keys with fingerprint
-      - add_ssh_keys:
-          fingerprints: ["8c:1a:3e:87:66:07:e0:75:7d:69:16:bb:81:dd:8d:8d"]
-      # attach workspace
-      - attach_workspace:
-          at: ~/
-      - run:
-          name: Install dependencies
-          command: |
-            # install the dependencies needed for your playbook
-            apk add --update jq tar gzip ansible nodejs npm curl
-            pip install awscli
-      - run: cat .circleci/ansible/inventory.txt  
-      - run:
-          name: Configure server
-          command: |
-            echo NODE_ENV=$NODE_ENV > ".env"
-            echo ENVIRONMENT=production >> ".env"
-            # echo DEV_DB_PASSWORD=postgres >> "backend/.env"
-            echo DEV_DB_HOST=$DEV_DB_HOST >> ".env"
-            echo DEV_DB_USER=$DEV_DB_USER >> ".env"
-            echo DEV_DB_PASSWORD=$DEV_DB_PASSWORD >> ".env"
-            echo DEV_DB_NAME=$DEV_DB_NAME >> ".env"
-            echo DEV_DB_DIALECT=$DEV_DB_DIALECT >> ".env"
-            cat .env
-            ansible-playbook -i ~/project/.circleci/ansible/inventory.txt ~/project/.circleci/ansible/configure-server.yml 
-      # Here's where you will add some code to rollback on failure      
-      - destroy-environment:
-          workflow_id: ${CIRCLE_WORKFLOW_ID:0:5}
-
-  deploy-node-app:
-    docker:
-      - image: python:3.7-alpine3.11 # Docker image here that supports Ansible
-    steps:
-      # Checkout code from git
-      - checkout
-      # Add ssh keys with fingerprint
-      - add_ssh_keys:
-          fingerprints: ["8c:1a:3e:87:66:07:e0:75:7d:69:16:bb:81:dd:8d:8d"]
-      # attach workspace
-      - attach_workspace:
-          at: ~/
-      - run:
-          name: Install dependencies
-          command: |
-            # your code here
-            apk add --update jq openssh-client tar gzip ansible nodejs npm curl
-            pip install awscli
-      - run: cat .circleci/ansible/inventory.txt
-      - run:
-          name: Add environment variables
-          command: |
-            cd backend
-            echo ENVIRONMENT=production > ".env"
-            echo TYPEORM_CONNECTION=postgres >> ".env"
-            echo TYPEORM_ENTITIES=./src/modules/domain/**/*.entity.ts >> ".env"
-            echo TYPEORM_MIGRATIONS=./src/migrations/*.ts >> ".env"
-            echo TYPEORM_MIGRATIONS_DIR=./src/migrations >> ".env"
-            echo NODE_ENV=production >> ".env"
-            echo TYPEORM_HOST=$TYPEORM_HOST >> ".env"
-            echo TYPEORM_PORT=$TYPEORM_PORT >> ".env"
-            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> ".env"
-            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> ".env"
-            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> ".env"
-            cat .env  
-      - run:
-          name: Deploy node app
-          # no_output_timeout: 30m
-          command: |
-            # your code here
-            tar -C backend -czvf artifact.tar.gz .
-            ls -la
-            export ANSIBLE_HOST_KEY_CHECKING=False
-            ansible-playbook -i ~/project/.circleci/ansible/inventory.txt ~/project/.circleci/ansible/deploy-backend.yml 
-            
-      # Here's where you will add some code to rollback on failure  
-      - revert-migrations:
-          workflow_id: ${CIRCLE_WORKFLOW_ID}
-      - destroy-environment:
-          workflow_id: ${CIRCLE_WORKFLOW_ID:0:5}
+            . venv/bin/activate
+            hadolint ./Dockerfile
 
   smoke-test:
     docker:
-      - image: python:3.7-alpine3.11 # Lightweight Docker image 
+      - image: << pipeline.parameters.stretch_image >>
     steps:
       # Checkout code from git
       - checkout
@@ -368,7 +259,7 @@ jobs:
             # your code here
             cat .circleci/ansible/inventory.txt
             export BACKEND_IP=$(sed -n 2p .circleci/ansible/inventory.txt)
-            export API_URL="http://${BACKEND_IP}:8080"
+            export API_URL="http://${BACKEND_IP}:$PROD_PORT"
             echo $API_URL
             if curl -s --head ${API_URL} 
             then
@@ -379,116 +270,148 @@ jobs:
               return 1
             fi
       # Here's where you will add some code to rollback on failure 
-      - revert-migrations:
-          workflow_id: ${CIRCLE_WORKFLOW_ID} 
       - destroy-environment:
           workflow_id: ${CIRCLE_WORKFLOW_ID:0:5}
 
-  cloudfront-update:
-    docker:
-      - image: amazon/aws-cli # Docker image here that supports AWS CLI
+  push-app-dockerhub:
+    machine: true
     steps:
-      # Checkout code from git
       - checkout
-      - run: yum -y install tar gzip
+      - run:
+          name: Build docker container and push to docker hub
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login -u "${DOCKER_USR}" --password-stdin
+            docker build -t devopscapstone:latest .
+            docker images ls
+            docker tag devopscapstone:latest ${DOCKER_USR}/devopscapstone:latest
+            docker push ${DOCKER_USR}/devopscapstone:latest
+  
+  deploy:
+    machine: true
+    steps:
+      - checkout
+      - run:
+          name: Install AWS CLI dependencies
+          working_directory: /tmp
+          command: |
+            sudo apt-get update && sudo apt-get install -yy less
+            sudo apt-get install unzip -y
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+      - run:
+          name: Update Docker Image in ECS
+          command: |
+            echo "Pre-Build Steps:"
+            echo "authenticating with AWS ECR..."
+            aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin 935363217793.dkr.ecr.eu-west-2.amazonaws.com
+
+            echo "Build Steps:"
+            echo "building image..."
+            docker build -t ${DOCKER_USR}/devopscapstone:latest .
+            
+            echo "Post-Build Steps:"
+            echo "pushing image to AWS ECR..."
+            docker push ${DOCKER_USR}/devopscapstone:latest
+            
+            echo "updating AWS ECS service..."
+            aws ecs update-service --cluster devopscapstone --service devopscapstone-sv --force-new-deployment --no-cli-pager
+            
+            echo "Done!"
+ 
+  
+  deploy-cluster:
+    docker: 
+    - image: << pipeline.parameters.amazon_image >>
+    steps:
+      - checkout
+      - run:
+          name: install dependencies
+          command: |
+            yum install -y ansible tar gzip openssl
+            curl --silent --location -o /usr/local/bin/kubectl https://amazon-eks.s3.eu-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
+            chmod +x /usr/local/bin/kubectl
+            mkdir -p $HOME/bin && cp ./kubectl $HOME/bin/kubectl && export PATH=$PATH:$HOME/bin
+            curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+            mv /tmp/eksctl /usr/local/bin
+            curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+    
+      - run:
+          name: Create EKS Cluster
+          command: |
+            cd .circleci/
+            ls -al
+            # rm ./kubeconfig
+            eksctl create cluster -f cluster.yml
+            config=$(cat /root/.kube/config)
+            echo ${config} > ./kubeconfig
+            kubectl get nodes
+            kubectl get pods -A -o wide
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project/.circleci/kubeconfig
+      # Here's where you will add some code to rollback on failure      
+      - destroy-cluster
+
+  deploy-app-v1:
+    docker: 
+    - image: << pipeline.parameters.amazon_image >>
+    steps:
+      - checkout
+      - run:
+          name: install dependencies
+          command: |
+            yum install -y ansible tar gzip openssl
+            curl --silent --location -o /usr/local/bin/kubectl https://amazon-eks.s3.eu-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
+            chmod +x /usr/local/bin/kubectl
+            mkdir -p $HOME/bin && cp ./kubectl $HOME/bin/kubectl && export PATH=$PATH:$HOME/bin
+            curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+            mv /tmp/eksctl /usr/local/bin
+            curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+      
       - attach_workspace:
           at: ~/
+      
       - run:
-          name: Install dependencies
+          name: Deploy Docker Application
           command: |
-            # your code here
-            yum install -y jq curl
-      - run:
-          name: Update cloudfront distribution
-          command: |
-            # your code here
-            export OLD_WORKFLOW_ID=$(aws cloudformation list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
-              --no-paginate --output text)
+            aws eks --region eu-west-2 update-kubeconfig --name devopscapstone
+            cd kubernetes/
+            ls -al
+            kubectl get svc
+            kubectl apply -f .
+            kubectl get pods,deploy,svc -o wide --show-labels  
+      
+      # Here's where you will add some code to rollback on failure      
+      - destroy-cluster
 
-            export STACKS=($(aws cloudformation list-stacks --query "StackSummaries[*].StackName" \
-              --stack-status-filter CREATE_COMPLETE --no-paginate --output text))
-
-            echo Old Workflow Id: ${OLD_WORKFLOW_ID}
-
-            if [ -n ${OLD_WORKFLOW_ID} ]
-            then
-              curl -H "Content-Type: text/plain" -H "token: 27210219-061d-4794-859b-d117428bfb4d" \
-              --request PUT --data "${OLD_WORKFLOW_ID}" \
-              https://api.memstash.io/values/udapeople-workflow-id
-            else
-              echo "No Old Workflow, New Stack Will Be Created"
-            fi
-           
-            echo Actual Workflow Id: ${CIRCLE_WORKFLOW_ID:0:5}
-
-            echo Stacks available: ${STACKS}
-
-            if [ -n "$OLD_WORKFLOW_ID" ]
-            then
-              StackOption=update-stack
-              StackName=udapeople-${OLD_WORKFLOW_ID}
-            else
-              StackOption=create-stack
-              StackName=udapeople-${CIRCLE_WORKFLOW_ID:0:5}
-            fi
-            
-            echo $StackOption "-" $StackName
-
-            # aws cloudformation $StackOption \
-            #   --stack-name $StackName \
-            #   --template-body file://~/project/.circleci/files/cloudfront.yml \
-            #   --parameter ParameterKey=WorkflowID,ParameterValue=${CIRCLE_WORKFLOW_ID:0:5} \
-            #   --tags Key=Name,Value=Udapeople-${CIRCLE_WORKFLOW_ID:0:5}
-
-            aws cloudformation update-stack \
-              --stack-name udapeople-${OLD_WORKFLOW_ID} \
-              --template-body file://~/project/.circleci/files/cloudfront.yml \
-              --parameter ParameterKey=WorkflowID,ParameterValue=${CIRCLE_WORKFLOW_ID:0:5} \
-              --tags Key=Name,Value=udapeople-${CIRCLE_WORKFLOW_ID:0:5}
-
-            # aws cloudformation update-stack \
-            #   --use-previous-template \
-            #   --stack-name udapeople-${OldWorkflowID} \
-            #   --parameters ParameterKey=WorkflowID,ParameterValue=$CIRCLE_WORKFLOW_ID:0:5,UsePreviousValue=false
-
-            # aws cloudformation deploy --template-file .circleci/files/cloudfront.yml --stack-name "udapeople-kk1j287dhjppmz436" --parameter-overrides WorkflowID=kk1j287dhjppmz436 --tags project=udapeople
-
-      # Here's where you will add some code to rollback on failure  
-      - destroy-environment:
-          workflow_id: ${CIRCLE_WORKFLOW_ID:0:5}
-
-  cleanup:
-    docker:
-      - image: amazon/aws-cli # Docker image here
+  deploy-app-v2:
+    docker: 
+    - image: << pipeline.parameters.amazon_image >>
     steps:
-      # Checkout code from git
       - checkout
-      - run: yum install -y tar gzip jq
       - run:
-          name: Get old stack workflow id and Remove old stacks and files
+          name: install dependencies
           command: |
-            # your code here
-            export OldWorkflowID=$(aws cloudformation \
-                list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
-                --no-paginate --output text)
+            yum install -y ansible tar gzip openssl
+            curl --silent --location -o /usr/local/bin/kubectl https://amazon-eks.s3.eu-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
+            chmod +x /usr/local/bin/kubectl
+            mkdir -p $HOME/bin && cp ./kubectl $HOME/bin/kubectl && export PATH=$PATH:$HOME/bin
+            curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+            mv /tmp/eksctl /usr/local/bin
+            curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+      
+      - run:
+          name: Deploy Docker Application v2
+          command: |
+            aws eks --region eu-west-2 update-kubeconfig --name devopscapstone
+            cd kubernetes/
+            ls -al
+            kubectl set image deployment/techtrends aalatishe86/apptrends:v2
+            kubectl rollout status deployment/techtrends
+            kubectl get pods,rs,deploy,svc -o wide --show-labels 
 
-            export STACKS=($(aws cloudformation list-stacks --query "StackSummaries[*].StackName" \
-                --stack-status-filter CREATE_COMPLETE --no-paginate --output text)) 
-
-            echo Old Workflow Id: "${OldWorkflowID}"
-            echo New Workflow Id: "${CIRCLE_WORKFLOW_ID:0:5}"
-            echo $STACKS
-
-            if [ -n ${OldWorkflowID} ]
-            then
-              # your code here
-              aws s3 rm "s3://udapeople-${OldWorkflowID}" --recursive
-              aws cloudformation delete-stack --stack-name backend-stack-${OldWorkflowID}
-              aws cloudformation delete-stack --stack-name frontend-stack-${OldWorkflowID}
-              echo "The stack udapeople-backend-${OldWorkflowID} and udapeople-frontend-${OldWorkflowID} was canceled!"
-            else
-              echo "No stacks to destroy"
-            fi
 
 workflows:
   default:
@@ -499,39 +422,22 @@ workflows:
           requires: [build-node-app]
       - lint-node-app:
           requires: [scan-node-app]
-      - deploy-infrastructure:
-          requires: [scan-node-app, lint-node-app]
-          filters:
-            branches:
-              only:
-                - master
-      - configure-infrastructure:
-          requires: [deploy-infrastructure]
-          filters:
-            branches:
-              only:
-                - master
-      # - run-migrations:
-      #     requires: [configure-infrastructure]
-      #     filters:
-      #       branches:
-      #         only:
-      #           - master
-      # - deploy-frontend:
-      #     requires: [run-migrations]
-      #     filters:
-      #       branches:
-      #         only:
-      #           - master
-      # - deploy-node-app:
-      #     requires: [run-migrations]
-      #     filters:
-      #       branches:
-      #         only:
-      #           - master
+      - lint-docker:
+          requires: [lint-node-app]
       # - smoke-test:
       #     requires: [deploy-node-app]
-      # - cloudfront-update:
-      #     requires: [smoke-test]
-      # - cleanup:
-      #     requires: [cloudfront-update]
+      #     filters:
+      #       branches:
+      #         only:
+      #           - master
+      # - push-app-dockerhub:
+      #     requires: [lint-node-app]
+      #     filters:
+      #       branches:
+      #         only:
+      #           - master
+      - deploy:
+          requires: [lint-docker]
+      - deploy-cluster:
+          requires: [deploy]
+          

@@ -16,10 +16,11 @@
     - deploy
 
   environment:
-    TYPEORM_CONNECTION: "{{ lookup('env','TYPEORM_CONNECTION') }}"
-    TYPEORM_HOST: "{{ lookup('env','TYPEORM_HOST') }}"
-    TYPEORM_USERNAME: "{{ lookup('env','TYPEORM_USERNAME') }}"
-    TYPEORM_PASSWORD: "{{ lookup('env','TYPEORM_PASSWORD') }}"
-    TYPEORM_DATABASE: "{{ lookup('env','TYPEORM_DATABASE') }}"
-    TYPEORM_MIGRATIONS: "{{ lookup('env','TYPEORM_MIGRATIONS') }}"
-    TYPEORM_ENTITIES: "{{ lookup('env','TYPEORM_ENTITIES') }}"
+    NODE_ENV: "{{ lookup('env','NODE_ENV') }}"
+    PROD_PORT: "{{ lookup('env','PROD_PORT') }}"
+    PROD_DB_HOST: "{{ lookup('env','PROD_DB_HOST') }}"
+    PROD_DB_USER: "{{ lookup('env','PROD_DB_USER') }}"
+    PROD_DB_PASSWORD: "{{ lookup('env','PROD_DB_PASSWORD') }}"
+    PROD_DB_NAME: "{{ lookup('env','PROD_DB_NAME') }}"
+    PROD_DB_DIALECT: "{{ lookup('env','PROD_DB_DIALECT') }}"
+    
