@@ -24,7 +24,7 @@ commands:
           name: Destroy backend environments
           when: on_fail
           command: |
-            aws cloudformation delete-stack --stack-name backend-stack-${CIRCLE_WORKFLOW_ID:0:5}
+            aws cloudformation delete-stack --stack-name node-app-stack-${CIRCLE_WORKFLOW_ID:0:5}
       - notify-slack-fail
       - notify-slack
 
@@ -49,14 +49,9 @@ commands:
           when: on_fail
           command: |
             # Your code here
-            if aws cloudformation wait stack-exists --stack-name frontend-stack-${CIRCLE_WORKFLOW_ID:0:5}
-            then 
-              aws cloudformation delete-stack --stack-name frontend-stack-${CIRCLE_WORKFLOW_ID:0:5}
-              echo "Delete frontend-stack successful"
-            fi
-            if aws cloudformation wait stack-exists --stack-name backend-stack-${CIRCLE_WORKFLOW_ID:0:5}
+            if aws cloudformation wait stack-exists --stack-name node-app-stack-${CIRCLE_WORKFLOW_ID:0:5}
             then
-              aws cloudformation delete-stack --stack-name backend-stack-${CIRCLE_WORKFLOW_ID:0:5}
+              aws cloudformation delete-stack --stack-name node-app-stack-${CIRCLE_WORKFLOW_ID:0:5}
               echo "Delete backend-stack successful"
             fi
       - notify-slack-fail
@@ -288,18 +283,15 @@ jobs:
       - run:
           name: Configure server
           command: |
-            echo NODE_ENV=production > "backend/.env"
-            echo ENVIRONMENT=production >> "backend/.env"
-            echo TYPEORM_CONNECTION=postgres >> "backend/.env"
-            echo TYPEORM_ENTITIES=./src/modules/domain/**/*.entity.ts >> "backend/.env"
-            echo TYPEORM_MIGRATIONS=./src/migrations/*.ts >> "backend/.env"
-            echo TYPEORM_MIGRATIONS_DIR=./src/migrations >> "backend/.env"
-            echo TYPEORM_HOST=$TYPEORM_HOST >> "backend/.env"
-            echo TYPEORM_PORT=$TYPEORM_PORT >> "backend/.env"
-            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> "backend/.env"
-            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> "backend/.env"
-            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> "backend/.env"
-            cat backend/.env
+            echo NODE_ENV=$NODE_ENV > ".env"
+            echo ENVIRONMENT=production >> ".env"
+            # echo DEV_DB_PASSWORD=postgres >> "backend/.env"
+            echo DEV_DB_HOST=$DEV_DB_HOST >> ".env"
+            echo DEV_DB_USER=$DEV_DB_USER >> ".env"
+            echo DEV_DB_PASSWORD=$DEV_DB_PASSWORD >> ".env"
+            echo DEV_DB_NAME=$DEV_DB_NAME >> ".env"
+            echo DEV_DB_DIALECT=$DEV_DB_DIALECT >> ".env"
+            cat .env
             ansible-playbook -i ~/project/.circleci/ansible/inventory.txt ~/project/.circleci/ansible/configure-server.yml 
       # Here's where you will add some code to rollback on failure      
       - destroy-environment:
@@ -513,12 +505,12 @@ workflows:
             branches:
               only:
                 - master
-      # - configure-infrastructure:
-      #     requires: [deploy-infrastructure]
-      #     filters:
-      #       branches:
-      #         only:
-      #           - master
+      - configure-infrastructure:
+          requires: [deploy-infrastructure]
+          filters:
+            branches:
+              only:
+                - master
       # - run-migrations:
       #     requires: [configure-infrastructure]
       #     filters:

@@ -13,15 +13,11 @@
     - ansible_stdout_callback: yaml
     - ENVIRONMENT: "{{ lookup('env','ENVIRONMENT') }}"
     - NODE_ENV: "{{ lookup('env','NODE_ENV') }}"
-    - TYPEORM_CONNECTION: "{{ lookup('env','TYPEORM_CONNECTION') }}"
-    - TYPEORM_ENTITIES: "{{ lookup('env','TYPEORM_ENTITIES') }}"
-    - TYPEORM_MIGRATIONS: "{{ lookup('env','TYPEORM_MIGRATIONS') }}"
-    - TYPEORM_MIGRATIONS_DIR: "{{ lookup('env','TYPEORM_MIGRATIONS_DIR') }}"
-    - TYPEORM_HOST: "{{ lookup('env','TYPEORM_HOST') }}"
-    - TYPEORM_PORT: "{{ lookup('env','TYPEORM_PORT') }}"
-    - TYPEORM_USERNAME: "{{ lookup('env','TYPEORM_USERNAME') }}"
-    - TYPEORM_PASSWORD: "{{ lookup('env','TYPEORM_PASSWORD') }}"
-    - TYPEORM_DATABASE: "{{ lookup('env','TYPEORM_DATABASE') }}"
+    - DEV_DB_HOST: "{{ lookup('env','DEV_DB_HOST') }}"
+    - DEV_DB_USER: "{{ lookup('env','DEV_DB_USER') }}"
+    - DEV_DB_PASSWORD: "{{ lookup('env','DEV_DB_PASSWORD') }}"
+    - DEV_DB_NAME: "{{ lookup('env','DEV_DB_NAME') }}"
+    - DEV_DB_DIALECT: "{{ lookup('env','DEV_DB_DIALECT') }}"
 
   pre_tasks:
     - name: "wait 600 seconds for target connection to become reachable/usable."
